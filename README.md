@@ -1,2 +1,5 @@
-# gymnarium_environments_gym
-Environments crate for gymnarium framework containing ported environments from OpenAIs gym.
+# Gymnarium: Gym Environments
+
+Environments crate for [Gymnarium](https://github.com/tiquthon/gymnarium) framework.
+
+Contains environments inspired by [OpenAIs gym](https://gym.openai.com/).
