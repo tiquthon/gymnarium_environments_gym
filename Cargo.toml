@@ -1,0 +1,16 @@
+[package]
+name = "gymnarium_environments_gym"
+version = "0.1.0"
+
+description = "A collection of environments used with the gymnarium libraries copied from OpenAI gym"
+keywords = ["gym", "reinforcement", "learning", "environment", "openai"]
+
+repository = "https://github.com/tiquthon/gymnarium_environments_gym"
+authors = ["Thimo Neumann <tiquthon@gmail.com>"]
+
+edition = "2018"
+license = "MIT"
+
+[dependencies]
+gymnarium_base = { path = "../gymnarium_base" }
+rand_chacha = "0.2.2"
