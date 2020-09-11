@@ -157,7 +157,7 @@ impl Environment<MountainCarError, ()> for MountainCar {
             let mut velocity = self.velocity();
 
             let direction = if let DimensionValue::INTEGER(f) = action
-                .get_value(&[1])
+                .get_value(&[0])
                 .expect("Could not extract direction out of action.")
             {
                 *f
