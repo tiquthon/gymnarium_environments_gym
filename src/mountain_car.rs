@@ -30,27 +30,37 @@
 //! [OpenAI Gym MountainCar-v0](https://gym.openai.com/envs/MountainCar-v0/) and
 //! [OpenAI Gym MountainCarContinuous-v0](https://gym.openai.com/envs/MountainCarContinuous-v0/).*
 
-use gymnarium_base::{Environment, ObservationSpace, ActionSpace, Seed, EnvironmentState, AgentAction};
-use gymnarium_base::space::{DimensionBoundaries, SpaceError, DimensionValue};
+use gymnarium_base::space::{DimensionBoundaries, DimensionValue, SpaceError};
+use gymnarium_base::{
+    ActionSpace, AgentAction, Environment, EnvironmentState, ObservationSpace, Seed, ToActionMapper,
+};
 
-use rand_chacha::ChaCha20Rng;
+use gymnarium_visualisers_base::input::{Button, ButtonState, Input, Key};
+use gymnarium_visualisers_base::{
+    Color, DrawableEnvironment, Geometry2D, Position2D, Size2D, TwoDimensionalDrawableEnvironment,
+    Vector2D, Viewport2D, Viewport2DModification,
+};
+
 use rand_chacha::rand_core::SeedableRng;
+use rand_chacha::ChaCha20Rng;
 
 /* --- --- --- GENERAL --- --- --- */
 
 #[derive(Debug)]
 pub enum MountainCarError {
     InternalSpaceError(SpaceError),
-    GivenActionDoesNotFitActionSpace
+    GivenActionDoesNotFitActionSpace,
 }
 
 impl std::fmt::Display for MountainCarError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InternalSpaceError(space_error) =>
-                write!(f, "An internal space error occurred ({})", space_error),
-            Self::GivenActionDoesNotFitActionSpace =>
-                write!(f, "Given Action does not fit ActionSpace"),
+            Self::InternalSpaceError(space_error) => {
+                write!(f, "An internal space error occurred ({})", space_error)
+            }
+            Self::GivenActionDoesNotFitActionSpace => {
+                write!(f, "Given Action does not fit ActionSpace")
+            }
         }
     }
 }
@@ -80,13 +90,35 @@ impl MountainCar {
             rng: ChaCha20Rng::from_entropy(),
         }
     }
+
+    fn position(&self) -> f32 {
+        if let DimensionValue::FLOAT(f) = self
+            .environment_state
+            .get_value(&[0])
+            .expect("Could not extract position out of environment state.")
+        {
+            *f
+        } else {
+            panic!("Position in environment state is no FLOAT.")
+        }
+    }
+
+    fn velocity(&self) -> f32 {
+        if let DimensionValue::FLOAT(f) = self
+            .environment_state
+            .get_value(&[1])
+            .expect("Could not extract velocity out of environment state.")
+        {
+            *f
+        } else {
+            panic!("Velocity in environment state is no FLOAT.")
+        }
+    }
 }
 
 impl Environment<MountainCarError, ()> for MountainCar {
     fn action_space() -> ActionSpace {
-        ActionSpace::simple(vec![
-            DimensionBoundaries::from(-1..=1)
-        ])
+        ActionSpace::simple(vec![DimensionBoundaries::from(-1..=1)])
     }
 
     fn observation_space() -> ObservationSpace {
@@ -114,21 +146,24 @@ impl Environment<MountainCarError, ()> for MountainCar {
         Ok(self.environment_state.clone())
     }
 
-    fn step(&mut self, action: &AgentAction) -> Result<(EnvironmentState, f64, bool, ()), MountainCarError> {
+    fn step(
+        &mut self,
+        action: &AgentAction,
+    ) -> Result<(EnvironmentState, f64, bool, ()), MountainCarError> {
         if !Self::action_space().contains(action) {
             Err(MountainCarError::GivenActionDoesNotFitActionSpace)
         } else {
-            let mut position = if let DimensionValue::FLOAT(f) = self.environment_state
-                .get_value(&[0])
-                .map_err(MountainCarError::InternalSpaceError)? { *f } else { panic!() };
-
-            let mut velocity =if let DimensionValue::FLOAT(f) = self.environment_state
-                .get_value(&[1])
-                .map_err(MountainCarError::InternalSpaceError)? { *f } else { panic!() };
+            let mut position = self.position();
+            let mut velocity = self.velocity();
 
             let direction = if let DimensionValue::INTEGER(f) = action
-                .get_value(&[0])
-                .map_err(MountainCarError::InternalSpaceError)? { *f } else { panic!() };
+                .get_value(&[1])
+                .expect("Could not extract direction out of action.")
+            {
+                *f
+            } else {
+                panic!("Given direction is no INTEGER.")
+            };
 
             velocity += direction as f32 * FORCE + (3f32 * position).cos() * (-GRAVITY);
             velocity = clamp(velocity, -MAXIMUM_SPEED, MAXIMUM_SPEED);
@@ -144,7 +179,8 @@ impl Environment<MountainCarError, ()> for MountainCar {
             let reward = -1.0f64;
 
             self.environment_state = EnvironmentState::simple(vec![
-                DimensionValue::FLOAT(position), DimensionValue::FLOAT(velocity)
+                DimensionValue::FLOAT(position),
+                DimensionValue::FLOAT(velocity),
             ]);
             Ok((self.environment_state.clone(), reward, done, ()))
         }
@@ -152,6 +188,149 @@ impl Environment<MountainCarError, ()> for MountainCar {
 
     fn close(&mut self) -> Result<(), MountainCarError> {
         Ok(())
+    }
+}
+
+impl DrawableEnvironment for MountainCar {
+    fn suggested_rendered_steps_per_second() -> Option<f64> {
+        Some(60f64)
+    }
+}
+
+impl TwoDimensionalDrawableEnvironment<MountainCarError> for MountainCar {
+    fn draw_two_dimensional(&self) -> Result<Vec<Geometry2D>, MountainCarError> {
+        let height_calculator: fn(f64) -> f64 = |x| (3f64 * x).sin() * 0.45f64 + 0.55f64;
+
+        // background
+        let background = Geometry2D::rectangle(
+            Position2D::with(300f64, 200f64),
+            Size2D::with(600f64, 400f64),
+        )
+        .fill_color(Color::white())
+        .line_or_border_color(Color::transparent());
+
+        // render
+
+        let screen_width = 600f32;
+
+        let world_width = MAXIMUM_POSITION - MINIMUM_POSITION;
+        let scale = screen_width / world_width;
+        let carwidth = 40f64;
+        let carheight = 20f64;
+
+        // track
+        let track = Geometry2D::polyline(
+            (0..=100)
+                .into_iter()
+                .map(|index| {
+                    index as f32 / 100f32 * (MAXIMUM_POSITION - MINIMUM_POSITION) + MINIMUM_POSITION
+                })
+                .map(|x| x as f64)
+                .map(|x| {
+                    Position2D::with(
+                        (x - MINIMUM_POSITION as f64) * scale as f64,
+                        height_calculator(x) * scale as f64,
+                    )
+                })
+                .collect(),
+        )
+        .line_or_border_color(Color::black())
+        .line_or_border_width(2f64);
+
+        // car
+        let clearance = 10f64;
+
+        let (l, r, t, b) = (-carwidth / 2f64, carwidth / 2f64, carheight, 0f64);
+        let chassis = Geometry2D::polygon(vec![
+            Position2D::with(l, b),
+            Position2D::with(l, t),
+            Position2D::with(r, t),
+            Position2D::with(r, b),
+        ])
+        .move_by(Vector2D::with(0f64, clearance));
+
+        let gray = (255f64 * 0.5f64) as u8;
+        let front_wheel = Geometry2D::circle(Position2D::zero(), carheight / 2.5f64)
+            .fill_color(Color::with(gray, gray, gray, 255))
+            .move_by(Vector2D::with(carwidth / 4f64, clearance));
+
+        let back_wheel = Geometry2D::circle(Position2D::zero(), carheight / 2.5f64)
+            .fill_color(Color::with(127, 127, 127, 255))
+            .move_by(Vector2D::with(-carwidth / 4f64, clearance));
+
+        let position = self.position();
+        let car = Geometry2D::group(vec![chassis, front_wheel, back_wheel])
+            .move_by(Vector2D::with(
+                (position - MINIMUM_POSITION) as f64 * scale as f64,
+                height_calculator(position as f64) * scale as f64,
+            ))
+            .rotate_around_self((3f64 * position as f64).cos());
+
+        // flag
+        let flagx = (GOAL_POSITION - MINIMUM_POSITION) as f64 * scale as f64;
+        let flagy1 = height_calculator(GOAL_POSITION as f64) * scale as f64;
+        let flagy2 = flagy1 + 50f64;
+        let flagpole = Geometry2D::line(
+            Position2D::with(flagx, flagy1),
+            Position2D::with(flagx, flagy2),
+        )
+        .line_or_border_color(Color::black())
+        .line_or_border_width(1f64);
+
+        let flag_color = (255f64 * 0.8f64) as u8;
+        let flag = Geometry2D::polygon(vec![
+            Position2D::with(flagx, flagy2),
+            Position2D::with(flagx, flagy2 - 10f64),
+            Position2D::with(flagx + 25f64, flagy2 - 5f64),
+        ])
+        .fill_color(Color::with(flag_color, flag_color, 0, 255));
+
+        Ok(vec![background, track, car, flagpole, flag])
+    }
+
+    fn preferred_view(&self) -> Result<(Viewport2D, Viewport2DModification), MountainCarError> {
+        Ok((
+            Viewport2D::with(
+                Position2D::with(300f64, 200f64),
+                Size2D::with(600f64, 400f64),
+            ),
+            Viewport2DModification::KeepAspectRatioAndScissorRemains,
+        ))
+    }
+}
+
+#[derive(Default)]
+struct MountainCarInputToActionMapper {
+    left_pressed: bool,
+    right_pressed: bool,
+}
+
+impl ToActionMapper<Vec<Input>, MountainCarError> for MountainCarInputToActionMapper {
+    fn map(&mut self, inputs: &Vec<Input>) -> Result<AgentAction, MountainCarError> {
+        for input in inputs {
+            if let Input::Button(button_args) = input {
+                if let Button::Keyboard(key) = button_args.button {
+                    match key {
+                        Key::Left => {
+                            self.left_pressed = button_args.state == ButtonState::Press;
+                        }
+                        Key::Right => {
+                            self.right_pressed = button_args.state == ButtonState::Press;
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+        Ok(AgentAction::simple(vec![DimensionValue::from(
+            if self.left_pressed && !self.right_pressed {
+                -1
+            } else if self.right_pressed && !self.left_pressed {
+                1
+            } else {
+                0
+            },
+        )]))
     }
 }
 
@@ -180,7 +359,10 @@ impl Environment<MountainCarError, ()> for MountainCarContinuous {
         todo!()
     }
 
-    fn step(&mut self, _action: &AgentAction) -> Result<(EnvironmentState, f64, bool, ()), MountainCarError> {
+    fn step(
+        &mut self,
+        _action: &AgentAction,
+    ) -> Result<(EnvironmentState, f64, bool, ()), MountainCarError> {
         todo!()
     }
 

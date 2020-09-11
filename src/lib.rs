@@ -4,6 +4,7 @@
 //! which are copied from the OpenAI gym python project.
 
 extern crate gymnarium_base;
+extern crate gymnarium_visualisers_base;
 extern crate rand_chacha;
 
 pub mod mountain_car;
