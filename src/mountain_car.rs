@@ -201,14 +201,6 @@ impl TwoDimensionalDrawableEnvironment<MountainCarError> for MountainCar {
     fn draw_two_dimensional(&self) -> Result<Vec<Geometry2D>, MountainCarError> {
         let height_calculator: fn(f64) -> f64 = |x| (3f64 * x).sin() * 0.45f64 + 0.55f64;
 
-        // background
-        let background = Geometry2D::rectangle(
-            Position2D::with(300f64, 200f64),
-            Size2D::with(600f64, 400f64),
-        )
-        .fill_color(Color::white())
-        .line_or_border_color(Color::transparent());
-
         // render
 
         let screen_width = 600f32;
@@ -285,17 +277,21 @@ impl TwoDimensionalDrawableEnvironment<MountainCarError> for MountainCar {
         ])
         .fill_color(Color::with(flag_color, flag_color, 0, 255));
 
-        Ok(vec![background, track, car, flagpole, flag])
+        Ok(vec![track, car, flagpole, flag])
     }
 
-    fn preferred_view(&self) -> Result<(Viewport2D, Viewport2DModification), MountainCarError> {
-        Ok((
+    fn preferred_view(&self) -> Option<(Viewport2D, Viewport2DModification)> {
+        Some((
             Viewport2D::with(
                 Position2D::with(300f64, 200f64),
                 Size2D::with(600f64, 400f64),
             ),
             Viewport2DModification::KeepAspectRatioAndScissorRemains,
         ))
+    }
+
+    fn preferred_background_color(&self) -> Option<Color> {
+        Some(Color::white())
     }
 }
 
