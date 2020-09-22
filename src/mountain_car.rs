@@ -297,7 +297,7 @@ impl TwoDimensionalDrawableEnvironment<MountainCarError> for MountainCar {
 }
 
 #[derive(Default)]
-struct MountainCarInputToActionMapper {
+pub struct MountainCarInputToActionMapper {
     left_pressed: bool,
     right_pressed: bool,
 }
