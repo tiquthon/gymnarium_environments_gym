@@ -36,10 +36,7 @@ use gymnarium_base::{
 };
 
 use gymnarium_visualisers_base::input::{Button, ButtonState, Input, Key};
-use gymnarium_visualisers_base::{
-    Color, DrawableEnvironment, Geometry2D, Position2D, Size2D, TwoDimensionalDrawableEnvironment,
-    Vector2D, Viewport2D, Viewport2DModification,
-};
+use gymnarium_visualisers_base::{Color, DrawableEnvironment, Geometry2D, Position2D, Size2D, TwoDimensionalDrawableEnvironment, Vector2D, Viewport2D, Viewport2DModification, LineShape};
 
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
@@ -226,6 +223,7 @@ impl TwoDimensionalDrawableEnvironment<MountainCarError> for MountainCar {
                 })
                 .collect(),
         )
+            .line_shape(LineShape::Round)
         .line_or_border_color(Color::black())
         .line_or_border_width(2f64);
 
