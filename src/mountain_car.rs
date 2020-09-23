@@ -41,6 +41,8 @@ use gymnarium_visualisers_base::{
     TwoDimensionalDrawableEnvironment, Vector2D, Viewport2D, Viewport2DModification,
 };
 
+use rand::distributions::{Distribution, Uniform};
+
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha20Rng;
 
@@ -76,6 +78,47 @@ const GOAL_POSITION: f32 = 0.5f32;
 
 /* --- --- --- DISCRETE MOUNTAIN CAR --- --- --- */
 
+/// The goal is to drive up the mountain on the right.
+///
+/// The agent (a car) is started at the bottom of a valley. For any given state the agent may
+/// choose to accelerate to the left, right or cease any acceleration.
+///
+/// *(Code semantic copied from [https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py](https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py).)*
+///
+/// ## Source
+/// The environment appeared first in Andrew Moore's PhD Thesis (1990).
+///
+/// ## Observation
+/// Space-Structure: `[2]`
+///
+/// | Index | Observation | Min | Max |
+/// | --- | --- | --- | --- |
+/// | `[0]` | Car Position | `-1.2` | `0.6` |
+/// | `[1]` | Car Velocity | `-0.07` | `0.07` |
+///
+/// ## Actions
+/// Space-Structure: `[1]`
+///
+/// | Value | Action |
+/// | --- | --- |
+/// | `[-1]` | Accelerate to the Left |
+/// | `[0]` | Don't accelerate |
+/// | `[1]` | Accelerate to the Right |
+///
+/// ## Reward
+/// Reward of `0` is awarded if the agent reached the flag (position = `0.5`) on top of the mountain.
+///
+/// Reward of `-1` is awarded if the position of the agent is less than `0.5`.
+///
+/// ## Starting State
+/// The position of the car is assigned a uniform random value in `[-0.6, -0.4]`.
+///
+/// The starting velocity of the car is always assigned to `0`.
+///
+/// ## Episode Termination
+/// - The car position is more than `0.5`
+/// - Episode length is greater than `200`
+///
 pub struct MountainCar {
     goal_velocity: f64,
     environment_state: EnvironmentState,
@@ -142,7 +185,10 @@ impl Environment<MountainCarError, ()> for MountainCar {
     }
 
     fn reset(&mut self) -> Result<EnvironmentState, MountainCarError> {
-        self.environment_state = Self::observation_space().sample_with(&mut self.rng);
+        self.environment_state = EnvironmentState::simple(vec![
+            DimensionValue::FLOAT(Uniform::new_inclusive(-0.6f32, -0.4f32).sample(&mut self.rng)),
+            DimensionValue::FLOAT(0f32),
+        ]);
         Ok(self.environment_state.clone())
     }
 
