@@ -30,6 +30,7 @@
 //! [OpenAI Gym MountainCar-v0](https://gym.openai.com/envs/MountainCar-v0/) and
 //! [OpenAI Gym MountainCarContinuous-v0](https://gym.openai.com/envs/MountainCarContinuous-v0/).*
 
+use gymnarium_base::math::{Position2D, Size2D, Vector2D};
 use gymnarium_base::space::{DimensionBoundaries, DimensionValue, SpaceError};
 use gymnarium_base::{
     ActionSpace, AgentAction, Environment, EnvironmentState, ObservationSpace, Seed, ToActionMapper,
@@ -37,8 +38,8 @@ use gymnarium_base::{
 
 use gymnarium_visualisers_base::input::{Button, ButtonState, Input, Key};
 use gymnarium_visualisers_base::{
-    Color, DrawableEnvironment, Geometry2D, LineShape, Position2D, Size2D,
-    TwoDimensionalDrawableEnvironment, Vector2D, Viewport2D, Viewport2DModification,
+    Color, DrawableEnvironment, Geometry2D, LineShape, TwoDimensionalDrawableEnvironment,
+    Viewport2D, Viewport2DModification,
 };
 
 use rand::distributions::{Distribution, Uniform};
