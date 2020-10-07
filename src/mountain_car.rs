@@ -31,7 +31,7 @@
 //! [OpenAI Gym MountainCarContinuous-v0](https://gym.openai.com/envs/MountainCarContinuous-v0/).*
 
 use gymnarium_base::math::{Position2D, Size2D, Vector2D};
-use gymnarium_base::space::{DimensionBoundaries, DimensionValue, SpaceError};
+use gymnarium_base::space::{DimensionBoundaries, DimensionValue};
 use gymnarium_base::{
     ActionSpace, AgentAction, Environment, EnvironmentState, ObservationSpace, Seed, ToActionMapper,
 };
@@ -51,16 +51,12 @@ use rand_chacha::ChaCha20Rng;
 
 #[derive(Debug)]
 pub enum MountainCarError {
-    InternalSpaceError(SpaceError),
     GivenActionDoesNotFitActionSpace,
 }
 
 impl std::fmt::Display for MountainCarError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InternalSpaceError(space_error) => {
-                write!(f, "An internal space error occurred ({})", space_error)
-            }
             Self::GivenActionDoesNotFitActionSpace => {
                 write!(f, "Given Action does not fit ActionSpace")
             }
@@ -122,7 +118,8 @@ const GOAL_POSITION: f32 = 0.5f32;
 ///
 pub struct MountainCar {
     goal_velocity: f64,
-    environment_state: EnvironmentState,
+    position: f32,
+    velocity: f32,
     rng: ChaCha20Rng,
 }
 
@@ -130,45 +127,29 @@ impl MountainCar {
     pub fn new(goal_velocity: f64) -> Self {
         Self {
             goal_velocity,
-            environment_state: Self::observation_space().sample(),
+            position: -0.5f32,
+            velocity: 0f32,
             rng: ChaCha20Rng::from_entropy(),
         }
     }
 
-    fn position(&self) -> f32 {
-        if let DimensionValue::FLOAT(f) = self
-            .environment_state
-            .get_value(&[0])
-            .expect("Could not extract position out of environment state.")
-        {
-            *f
-        } else {
-            panic!("Position in environment state is no FLOAT.")
-        }
-    }
-
-    fn velocity(&self) -> f32 {
-        if let DimensionValue::FLOAT(f) = self
-            .environment_state
-            .get_value(&[1])
-            .expect("Could not extract velocity out of environment state.")
-        {
-            *f
-        } else {
-            panic!("Velocity in environment state is no FLOAT.")
-        }
+    fn environment_state(&self) -> EnvironmentState {
+        EnvironmentState::simple(vec![
+            DimensionValue::FLOAT(self.position),
+            DimensionValue::FLOAT(self.velocity),
+        ])
     }
 }
 
 impl Environment<MountainCarError, ()> for MountainCar {
     fn action_space() -> ActionSpace {
-        ActionSpace::simple(vec![DimensionBoundaries::from(-1..=1)])
+        ActionSpace::simple(vec![DimensionBoundaries::INTEGER(-1, 1)])
     }
 
     fn observation_space() -> ObservationSpace {
         ObservationSpace::simple(vec![
-            DimensionBoundaries::from(MINIMUM_POSITION..=MAXIMUM_POSITION),
-            DimensionBoundaries::from(-MAXIMUM_SPEED..=MAXIMUM_SPEED),
+            DimensionBoundaries::FLOAT(MINIMUM_POSITION, MAXIMUM_POSITION),
+            DimensionBoundaries::FLOAT(-MAXIMUM_SPEED, MAXIMUM_SPEED),
         ])
     }
 
@@ -186,11 +167,9 @@ impl Environment<MountainCarError, ()> for MountainCar {
     }
 
     fn reset(&mut self) -> Result<EnvironmentState, MountainCarError> {
-        self.environment_state = EnvironmentState::simple(vec![
-            DimensionValue::FLOAT(Uniform::new_inclusive(-0.6f32, -0.4f32).sample(&mut self.rng)),
-            DimensionValue::FLOAT(0f32),
-        ]);
-        Ok(self.environment_state.clone())
+        self.position = Uniform::new_inclusive(-0.6f32, -0.4f32).sample(&mut self.rng);
+        self.velocity = 0f32;
+        Ok(self.environment_state())
     }
 
     fn step(
@@ -200,36 +179,22 @@ impl Environment<MountainCarError, ()> for MountainCar {
         if !Self::action_space().contains(action) {
             Err(MountainCarError::GivenActionDoesNotFitActionSpace)
         } else {
-            let mut position = self.position();
-            let mut velocity = self.velocity();
+            let direction = action[&[0]].expect_integer();
 
-            let direction = if let DimensionValue::INTEGER(f) = action
-                .get_value(&[0])
-                .expect("Could not extract direction out of action.")
-            {
-                *f
-            } else {
-                panic!("Given direction is no INTEGER.")
-            };
+            self.velocity += direction as f32 * FORCE + (3f32 * self.position).cos() * (-GRAVITY);
+            self.velocity = clamp(self.velocity, -MAXIMUM_SPEED, MAXIMUM_SPEED);
 
-            velocity += direction as f32 * FORCE + (3f32 * position).cos() * (-GRAVITY);
-            velocity = clamp(velocity, -MAXIMUM_SPEED, MAXIMUM_SPEED);
+            self.position += self.velocity;
+            self.position = clamp(self.position, MINIMUM_POSITION, MAXIMUM_POSITION);
 
-            position += velocity;
-            position = clamp(position, MINIMUM_POSITION, MAXIMUM_POSITION);
-
-            if position == MINIMUM_POSITION && velocity < 0f32 {
-                velocity = 0f32;
+            if self.position == MINIMUM_POSITION && self.velocity < 0f32 {
+                self.velocity = 0f32;
             }
 
-            let done = position >= GOAL_POSITION && velocity >= self.goal_velocity as f32;
+            let done = self.position >= GOAL_POSITION && self.velocity >= self.goal_velocity as f32;
             let reward = -1.0f64;
 
-            self.environment_state = EnvironmentState::simple(vec![
-                DimensionValue::FLOAT(position),
-                DimensionValue::FLOAT(velocity),
-            ]);
-            Ok((self.environment_state.clone(), reward, done, ()))
+            Ok((self.environment_state(), reward, done, ()))
         }
     }
 
@@ -298,13 +263,12 @@ impl TwoDimensionalDrawableEnvironment<MountainCarError> for MountainCar {
             .fill_color(Color::with(127, 127, 127, 255))
             .move_by(Vector2D::with(-carwidth / 4f64, clearance));
 
-        let position = self.position();
         let car = Geometry2D::group(vec![chassis, front_wheel, back_wheel])
             .move_by(Vector2D::with(
-                (position - MINIMUM_POSITION) as f64 * scale as f64,
-                height_calculator(position as f64) * scale as f64,
+                (self.position - MINIMUM_POSITION) as f64 * scale as f64,
+                height_calculator(self.position as f64) * scale as f64,
             ))
-            .rotate_around_self((3f64 * position as f64).cos());
+            .rotate_around_self((3f64 * self.position as f64).cos());
 
         // flag
         let flagx = (GOAL_POSITION - MINIMUM_POSITION) as f64 * scale as f64;
