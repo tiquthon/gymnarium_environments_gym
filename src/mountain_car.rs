@@ -31,6 +31,7 @@
 //! [OpenAI Gym MountainCarContinuous-v0](https://gym.openai.com/envs/MountainCarContinuous-v0/).*
 
 use gymnarium_base::math::{Position2D, Size2D, Vector2D};
+use gymnarium_base::serde::{Deserialize, Serialize};
 use gymnarium_base::space::{DimensionBoundaries, DimensionValue};
 use gymnarium_base::{
     ActionSpace, AgentAction, Environment, EnvironmentState, ObservationSpace, Seed, ToActionMapper,
@@ -80,7 +81,7 @@ const GOAL_POSITION: f32 = 0.5f32;
 /// The agent (a car) is started at the bottom of a valley. For any given state the agent may
 /// choose to accelerate to the left, right or cease any acceleration.
 ///
-/// *(Code semantic copied from [https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py](https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py).)*
+/// *(Code semantic copied from <https://github.com/openai/gym/blob/master/gym/envs/classic_control/mountain_car.py>.)*
 ///
 /// ## Source
 /// The environment appeared first in Andrew Moore's PhD Thesis (1990).
@@ -120,28 +121,24 @@ pub struct MountainCar {
     goal_velocity: f64,
     position: f32,
     velocity: f32,
+    last_seed: Seed,
     rng: ChaCha20Rng,
 }
 
 impl MountainCar {
     pub fn new(goal_velocity: f64) -> Self {
+        let last_seed = Seed::new_random();
         Self {
             goal_velocity,
             position: -0.5f32,
             velocity: 0f32,
-            rng: ChaCha20Rng::from_entropy(),
+            last_seed: last_seed.clone(),
+            rng: ChaCha20Rng::from_seed(last_seed.into()),
         }
-    }
-
-    fn environment_state(&self) -> EnvironmentState {
-        EnvironmentState::simple(vec![
-            DimensionValue::FLOAT(self.position),
-            DimensionValue::FLOAT(self.velocity),
-        ])
     }
 }
 
-impl Environment<MountainCarError, ()> for MountainCar {
+impl Environment<MountainCarError, (), MountainCarStorage> for MountainCar {
     fn action_space() -> ActionSpace {
         ActionSpace::simple(vec![DimensionBoundaries::INTEGER(-1, 1)])
     }
@@ -159,9 +156,11 @@ impl Environment<MountainCarError, ()> for MountainCar {
 
     fn reseed(&mut self, random_seed: Option<Seed>) -> Result<(), MountainCarError> {
         if let Some(seed) = random_seed {
-            self.rng = ChaCha20Rng::from_seed(seed.into());
+            self.last_seed = seed;
+            self.rng = ChaCha20Rng::from_seed(self.last_seed.clone().into());
         } else {
-            self.rng = ChaCha20Rng::from_entropy();
+            self.last_seed = Seed::new_random();
+            self.rng = ChaCha20Rng::from_seed(self.last_seed.clone().into());
         }
         Ok(())
     }
@@ -169,7 +168,14 @@ impl Environment<MountainCarError, ()> for MountainCar {
     fn reset(&mut self) -> Result<EnvironmentState, MountainCarError> {
         self.position = Uniform::new_inclusive(-0.6f32, -0.4f32).sample(&mut self.rng);
         self.velocity = 0f32;
-        Ok(self.environment_state())
+        Ok(self.state())
+    }
+
+    fn state(&self) -> EnvironmentState {
+        EnvironmentState::simple(vec![
+            DimensionValue::FLOAT(self.position),
+            DimensionValue::FLOAT(self.velocity),
+        ])
     }
 
     fn step(
@@ -194,7 +200,27 @@ impl Environment<MountainCarError, ()> for MountainCar {
             let done = self.position >= GOAL_POSITION && self.velocity >= self.goal_velocity as f32;
             let reward = -1.0f64;
 
-            Ok((self.environment_state(), reward, done, ()))
+            Ok((self.state(), reward, done, ()))
+        }
+    }
+
+    fn load(&mut self, data: MountainCarStorage) -> Result<(), MountainCarError> {
+        self.goal_velocity = data.goal_velocity;
+        self.position = data.position;
+        self.velocity = data.velocity;
+        self.last_seed = data.last_seed.clone();
+        self.rng = ChaCha20Rng::from_seed(self.last_seed.clone().into());
+        self.rng.set_word_pos(data.rng_word_pos);
+        Ok(())
+    }
+
+    fn store(&self) -> MountainCarStorage {
+        MountainCarStorage {
+            goal_velocity: self.goal_velocity,
+            position: self.position,
+            velocity: self.velocity,
+            last_seed: self.last_seed.clone(),
+            rng_word_pos: self.rng.get_word_pos(),
         }
     }
 
@@ -307,6 +333,15 @@ impl TwoDimensionalDrawableEnvironment<MountainCarError> for MountainCar {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct MountainCarStorage {
+    goal_velocity: f64,
+    position: f32,
+    velocity: f32,
+    last_seed: Seed,
+    rng_word_pos: u128,
+}
+
 #[derive(Default)]
 pub struct MountainCarInputToActionMapper {
     left_pressed: bool,
@@ -346,7 +381,7 @@ impl ToActionMapper<Vec<Input>, MountainCarError> for MountainCarInputToActionMa
 
 pub struct MountainCarContinuous;
 
-impl Environment<MountainCarError, ()> for MountainCarContinuous {
+impl Environment<MountainCarError, (), MountainCarStorage> for MountainCarContinuous {
     fn action_space() -> ActionSpace {
         todo!()
     }
@@ -367,10 +402,22 @@ impl Environment<MountainCarError, ()> for MountainCarContinuous {
         todo!()
     }
 
+    fn state(&self) -> EnvironmentState {
+        todo!()
+    }
+
     fn step(
         &mut self,
         _action: &AgentAction,
     ) -> Result<(EnvironmentState, f64, bool, ()), MountainCarError> {
+        todo!()
+    }
+
+    fn load(&mut self, _data: MountainCarStorage) -> Result<(), MountainCarError> {
+        todo!()
+    }
+
+    fn store(&self) -> MountainCarStorage {
         todo!()
     }
 

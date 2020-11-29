@@ -14,5 +14,6 @@ license = "MIT"
 [dependencies]
 gymnarium_base = { path = "../gymnarium_base" }
 gymnarium_visualisers_base = { path = "../gymnarium_visualisers_base" }
+serde = { version = "1.0.117", features = ["derive"] }
 rand = "0.7.3"
 rand_chacha = "0.2.2"
