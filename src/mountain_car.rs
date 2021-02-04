@@ -198,7 +198,7 @@ impl Environment<MountainCarError, (), MountainCarStorage> for MountainCar {
             }
 
             let done = self.position >= GOAL_POSITION && self.velocity >= self.goal_velocity as f32;
-            let reward = -1.0f64;
+            let reward = if done { 0f64 } else { -1.0f64 };
 
             Ok((self.state(), reward, done, ()))
         }
