@@ -30,7 +30,7 @@
 //! [OpenAI Gym MountainCar-v0](https://gym.openai.com/envs/MountainCar-v0/) and
 //! [OpenAI Gym MountainCarContinuous-v0](https://gym.openai.com/envs/MountainCarContinuous-v0/).*
 
-use gymnarium_base::math::{Position2D, Size2D, Vector2D};
+use gymnarium_base::math::{radians_to_degrees, Position2D, Size2D, Vector2D};
 use gymnarium_base::serde::{Deserialize, Serialize};
 use gymnarium_base::space::{DimensionBoundaries, DimensionValue};
 use gymnarium_base::{
@@ -294,7 +294,7 @@ impl TwoDimensionalDrawableEnvironment<MountainCarError> for MountainCar {
                 (self.position - MINIMUM_POSITION) as f64 * scale as f64,
                 height_calculator(self.position as f64) * scale as f64,
             ))
-            .rotate_around_self((3f64 * self.position as f64).cos());
+            .rotate_around_self(radians_to_degrees((3f64 * self.position as f64).cos()));
 
         // flag
         let flagx = (GOAL_POSITION - MINIMUM_POSITION) as f64 * scale as f64;
