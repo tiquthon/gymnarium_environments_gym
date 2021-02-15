@@ -138,7 +138,7 @@ impl MountainCar {
     }
 }
 
-impl Environment<MountainCarError, (), MountainCarStorage> for MountainCar {
+impl Environment<MountainCarError, f64, (), MountainCarStorage> for MountainCar {
     fn action_space() -> ActionSpace {
         ActionSpace::simple(vec![DimensionBoundaries::INTEGER(-1, 1)])
     }
@@ -381,7 +381,7 @@ impl ToActionMapper<Vec<Input>, MountainCarError> for MountainCarInputToActionMa
 
 pub struct MountainCarContinuous;
 
-impl Environment<MountainCarError, (), MountainCarStorage> for MountainCarContinuous {
+impl Environment<MountainCarError, f64, (), MountainCarStorage> for MountainCarContinuous {
     fn action_space() -> ActionSpace {
         todo!()
     }
