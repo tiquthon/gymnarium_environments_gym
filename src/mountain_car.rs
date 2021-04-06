@@ -140,13 +140,13 @@ impl MountainCar {
 
 impl Environment<MountainCarError, f64, (), MountainCarStorage> for MountainCar {
     fn action_space() -> ActionSpace {
-        ActionSpace::simple(vec![DimensionBoundaries::INTEGER(-1, 1)])
+        ActionSpace::simple(vec![DimensionBoundaries::Integer(-1, 1)])
     }
 
     fn observation_space() -> ObservationSpace {
         ObservationSpace::simple(vec![
-            DimensionBoundaries::FLOAT(MINIMUM_POSITION, MAXIMUM_POSITION),
-            DimensionBoundaries::FLOAT(-MAXIMUM_SPEED, MAXIMUM_SPEED),
+            DimensionBoundaries::Float(MINIMUM_POSITION, MAXIMUM_POSITION),
+            DimensionBoundaries::Float(-MAXIMUM_SPEED, MAXIMUM_SPEED),
         ])
     }
 
@@ -173,8 +173,8 @@ impl Environment<MountainCarError, f64, (), MountainCarStorage> for MountainCar 
 
     fn state(&self) -> EnvironmentState {
         EnvironmentState::simple(vec![
-            DimensionValue::FLOAT(self.position),
-            DimensionValue::FLOAT(self.velocity),
+            DimensionValue::Float(self.position),
+            DimensionValue::Float(self.velocity),
         ])
     }
 
